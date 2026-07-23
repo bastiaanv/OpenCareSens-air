@@ -2,8 +2,13 @@
 // Debug oracle output — all intermediate values for one reading (1579 bytes packed in C).
 // Maps to air1_opcal4_debug_t.
 
+import Foundation
+
 /// Debug output containing all intermediate values for one reading.
 public final class DebugOutput {
+
+    // MARK: - Fields
+
     public var seqNumberOriginal: Int = 0
     public var seqNumberFinal: Int = 0
     public var measurementTimeStandard: Int64 = 0
@@ -171,6 +176,8 @@ public final class DebugOutput {
     public var err128Flag: Int = 0
     public var err128RevisedValue: Double = 0.0
     public var err128Normal: Double = 0.0
+
+    // MARK: - Initialization
 
     public init() {
         workout = Array(repeating: 0, count: 30)
