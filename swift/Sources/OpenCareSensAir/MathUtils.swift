@@ -12,7 +12,10 @@ public enum MathUtils {
     public static func mathRound(_ x: Double) -> Double {
         if x.isNaN { return .nan }
         let adj: Double = (x < 0.0) ? -0.5 : 0.5
-        return Double(Int64(x + adj))
+        let r = x + adj
+        if r >= 9.223372036854776e+18 { return Double(Int64.max) }
+        if r < -9.223372036854776e+18 { return Double(Int64.min) }
+        return Double(Int64(r))
     }
 
     /// Ceiling function matching C truncation semantics.

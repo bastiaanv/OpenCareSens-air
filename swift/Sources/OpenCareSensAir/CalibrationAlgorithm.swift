@@ -498,7 +498,8 @@ public enum CalibrationAlgorithm {
 
         // --- Step 13: Error detection ---
         let errcode = CheckError.checkError(devInfo, algoArgs, algoDebug,
-            resultGlucose, correctedCurrent, seq, timeNow, currentStage)
+            currentGlucose: resultGlucose, correctedCurrent: correctedCurrent,
+            seq: seq, timeNow: timeNow, stage: currentStage)
 
         // Update prev_last_1min_curr
         algoArgs.err1PrevLast1minCurr = tranInA1min[4]

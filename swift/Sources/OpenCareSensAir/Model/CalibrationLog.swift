@@ -2,8 +2,10 @@
 // Calibration log entry — one per BG calibration event (104 bytes in C).
 // Maps to air1_opcal4_cal_log_t.
 
+import Foundation
+
 /// Calibration log entry for one BG calibration event.
-public final class CalibrationLog {
+public final class CalibrationLog: Codable {
     public var group: Int = 0
     public var bgTime: Int64 = 0
     public var bgSeq: Double = 0.0

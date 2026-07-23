@@ -3,7 +3,7 @@
 // Maps to air1_opcal4_arguments_t.
 
 /// Persistent algorithm state holding all inter-reading state.
-public final class AlgorithmState {
+public final class AlgorithmState: Codable {
     public var argsSeq: Int = 0
     public var lotType: Int = 0
     public var sensorStartTime: Int64 = 0

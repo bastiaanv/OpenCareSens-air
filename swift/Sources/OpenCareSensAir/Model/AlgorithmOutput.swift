@@ -2,6 +2,8 @@
 // Per-reading algorithm output (155 bytes packed in C).
 // Maps to air1_opcal4_output_t.
 
+import Foundation
+
 /// Per-reading algorithm output from the calibration pipeline.
 public final class AlgorithmOutput {
     public var seqNumberOriginal: Int = 0

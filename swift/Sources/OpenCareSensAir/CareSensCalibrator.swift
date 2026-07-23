@@ -45,7 +45,7 @@ public final class CareSensCalibrator {
     public private(set) var readingsProcessed: Int
 
     /// Serialization format version. Increment when AlgorithmState layout changes.
-    private static let stateVersion = 1
+    static let stateVersion = 1
 
     /// Create a new calibrator for a CareSens Air sensor.
     ///
@@ -124,24 +124,46 @@ public final class CareSensCalibrator {
     // State serialization
     // ======================================================================
 
+    /// Error type for calibrator state serialization/deserialization failures.
+    public enum StateError: Error, Equatable {
+        /// The state data is empty.
+        case emptyData
+        /// The state data is corrupted or not a valid serialized state.
+        case corruptedData
+        /// The serialized state version does not match the expected version.
+        case incompatibleVersion(expected: Int, found: Int)
+    }
+
     /// Serialize the current calibrator state for persistence.
     ///
-    /// The returned byte array can be stored in UserDefaults, a database,
+    /// The returned `Data` uses a simple binary format:
+    /// - 4 bytes: magic number (0x4F435341 = "OCSA")
+    /// - 4 bytes: version (Int32, big-endian)
+    /// - 4 bytes: readingsProcessed (Int32, big-endian)
+    /// - Remaining: JSON-encoded `AlgorithmState`
+    ///
+    /// The returned data can be stored in UserDefaults, a database,
     /// or any other storage mechanism. Use ``restoreState(_:config:)`` to
     /// reconstruct the calibrator later.
     ///
-    /// - Returns: serialized state bytes
-    /// - Warning: Not yet implemented. AlgorithmState contains a very large
-    ///   number of fields; proper binary serialization will be added in a
-    ///   future revision. Calling this method will terminate with
-    ///   `fatalError`.
+    /// - Returns: serialized state data
     public func saveState() -> Data {
-        // TODO: Implement binary serialization of AlgorithmState.
-        // AlgorithmState is a reference type with ~200 fields including many
-        // large arrays. Implementing Codable or a manual binary serializer
-        // requires enumerating every field. This will be addressed in a
-        // follow-up commit.
-        fatalError("CareSensCalibrator.saveState() is not yet implemented")
+        var data = Data()
+        // Magic number: "OCSA" in big-endian
+        let magic: UInt32 = 0x4F435341
+        data.append(contentsOf: withUnsafeBytes(of: magic.bigEndian) { Array($0) })
+        // Version
+        let version = Int32(CareSensCalibrator.stateVersion)
+        data.append(contentsOf: withUnsafeBytes(of: version.bigEndian) { Array($0) })
+        // Readings processed
+        let readings = Int32(readingsProcessed)
+        data.append(contentsOf: withUnsafeBytes(of: readings.bigEndian) { Array($0) })
+        // JSON-encoded AlgorithmState
+        let encoder = JSONEncoder()
+        if let stateData = try? encoder.encode(state) {
+            data.append(stateData)
+        }
+        return data
     }
 
     /// Restore a calibrator from previously saved state.
@@ -154,11 +176,46 @@ public final class CareSensCalibrator {
     ///   - stateData: serialized state from ``saveState()``
     ///   - config: sensor factory calibration parameters
     /// - Returns: restored calibrator
-    /// - Warning: Not yet implemented. See ``saveState()`` for details.
-    ///   Calling this method will terminate with `fatalError`.
-    public static func restoreState(_ stateData: Data, config: SensorConfig) -> CareSensCalibrator {
-        // TODO: Implement binary deserialization of AlgorithmState.
-        // See saveState() for context.
-        fatalError("CareSensCalibrator.restoreState() is not yet implemented")
+    /// - Throws: `StateError` if the data is empty, corrupted, or has an
+    ///   incompatible version.
+    public static func restoreState(_ stateData: Data, config: SensorConfig) throws -> CareSensCalibrator {
+        guard !stateData.isEmpty else {
+            throw StateError.emptyData
+        }
+
+        // Minimum: 4 (magic) + 4 (version) + 4 (readings) = 12 bytes
+        guard stateData.count >= 12 else {
+            throw StateError.corruptedData
+        }
+
+        // Read and validate magic number
+        let magic = stateData.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
+        guard magic.bigEndian == 0x4F435341 else {
+            throw StateError.corruptedData
+        }
+
+        // Read version
+        let version = Int(stateData.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 4, as: Int32.self) }.bigEndian)
+        guard version == stateVersion else {
+            throw StateError.incompatibleVersion(expected: stateVersion, found: version)
+        }
+
+        // Read readingsProcessed
+        let readingsProcessed = Int(stateData.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 8, as: Int32.self) }.bigEndian)
+
+        // Decode AlgorithmState from the JSON payload after the 12-byte header
+        let jsonData = stateData.subdata(in: 12..<stateData.count)
+        let decoder = JSONDecoder()
+        let restoredState: AlgorithmState
+        do {
+            restoredState = try decoder.decode(AlgorithmState.self, from: jsonData)
+        } catch {
+            throw StateError.corruptedData
+        }
+
+        let calibrator = CareSensCalibrator(config)
+        calibrator.state = restoredState
+        calibrator.readingsProcessed = readingsProcessed
+        return calibrator
     }
 }

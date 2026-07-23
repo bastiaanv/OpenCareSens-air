@@ -2,6 +2,8 @@
 // Per-reading CGM input — raw sensor data for one measurement (74 bytes packed in C).
 // Maps to air1_opcal4_cgm_input_t.
 
+import Foundation
+
 /// Per-reading CGM input containing raw sensor data.
 public final class CgmInput {
     public var seqNumber: Int = 0

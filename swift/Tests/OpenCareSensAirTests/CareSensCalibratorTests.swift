@@ -354,43 +354,91 @@ final class CareSensCalibratorTests: XCTestCase {
     // ======================================================================
 
     func testSaveRestoreCount() throws {
-        // Java: tests saveState()/restoreState() round-trip
-        // Swift: saveState()/restoreState() are not yet implemented (fatalError).
-        throw XCTSkip("saveState()/restoreState() not yet implemented in Swift")
+        let config = Self.createTypicalConfig()
+        let cal = CareSensCalibrator(config)
+
+        for s in 1...3 {
+            _ = cal.processReading(
+                seqNumber: s, timestamp: Int64(s * 300),
+                adcSamples: Self.createAdcSamples(2000), temperature: 36.5)
+        }
+        XCTAssertEqual(3, cal.readingsProcessed)
+
+        let saved = cal.saveState()
+        XCTAssertFalse(saved.isEmpty)
+
+        let restored = try CareSensCalibrator.restoreState(saved, config: config)
+        XCTAssertEqual(3, restored.readingsProcessed)
     }
 
     func testSaveRestoreContinuity() throws {
-        // Java: tests that restored calibrator produces same output as continued original
-        // Swift: saveState()/restoreState() are not yet implemented (fatalError).
-        throw XCTSkip("saveState()/restoreState() not yet implemented in Swift")
-    }
+        let config = Self.createTypicalConfig()
+        let cal = CareSensCalibrator(config)
 
-    func testRestoreNull() throws {
-        // Java: assertThrows(IllegalArgumentException.class, () ->
-        //     CareSensCalibrator.restoreState(null, createTypicalConfig()))
-        // In Swift, Data is non-optional; nil cannot be passed.
-        throw XCTSkip("Not applicable: Data is non-optional in Swift")
+        // Feed 5 readings
+        for s in 1...5 {
+            _ = cal.processReading(
+                seqNumber: s, timestamp: Int64(s * 300),
+                adcSamples: Self.createAdcSamples(2000), temperature: 36.5)
+        }
+
+        // Save state
+        let saved = cal.saveState()
+
+        // Process reading 6 on original
+        let r6original = cal.processReading(
+            seqNumber: 6, timestamp: 1800,
+            adcSamples: Self.createAdcSamples(2000), temperature: 36.5)
+
+        // Process reading 6 on restored
+        let restored = try CareSensCalibrator.restoreState(saved, config: config)
+        let r6restored = restored.processReading(
+            seqNumber: 6, timestamp: 1800,
+            adcSamples: Self.createAdcSamples(2000), temperature: 36.5)
+
+        // Results should be identical
+        XCTAssertEqual(r6original.glucoseMgdl, r6restored.glucoseMgdl, accuracy: 0.0)
+        XCTAssertEqual(r6original.trendRate, r6restored.trendRate, accuracy: 0.0)
+        XCTAssertEqual(r6original.errorCode, r6restored.errorCode)
+        XCTAssertEqual(r6original.stage, r6restored.stage)
     }
 
     func testRestoreEmpty() throws {
-        // Java: assertThrows(IllegalArgumentException.class, () ->
-        //     CareSensCalibrator.restoreState(new byte[0], createTypicalConfig()))
-        // Swift: restoreState() is not yet implemented (fatalError).
-        throw XCTSkip("restoreState() not yet implemented in Swift")
+        XCTAssertThrowsError(try CareSensCalibrator.restoreState(Data(), config: Self.createTypicalConfig())) { error in
+            XCTAssertEqual(error as? CareSensCalibrator.StateError, .emptyData)
+        }
     }
 
     func testRestoreGarbage() throws {
-        // Java: assertThrows(RuntimeException.class, () ->
-        //     CareSensCalibrator.restoreState(new byte[]{1, 2, 3}, createTypicalConfig()))
-        // Swift: restoreState() is not yet implemented (fatalError).
-        throw XCTSkip("restoreState() not yet implemented in Swift")
+        let garbage = Data([1, 2, 3])
+        XCTAssertThrowsError(try CareSensCalibrator.restoreState(garbage, config: Self.createTypicalConfig())) { error in
+            XCTAssertEqual(error as? CareSensCalibrator.StateError, .corruptedData)
+        }
     }
 
     func testRestoreIncompatibleVersion() throws {
-        // Java: builds a byte stream with wrong version number using ObjectOutputStream,
-        // then verifies restoreState throws RuntimeException with "Incompatible state version".
-        // Swift: restoreState() is not yet implemented and uses a different serialization format.
-        throw XCTSkip("restoreState() not yet implemented in Swift")
+        // Build a binary payload with a wrong version number
+        var badData = Data()
+        // Magic number
+        let magic: UInt32 = 0x4F435341
+        badData.append(contentsOf: withUnsafeBytes(of: magic.bigEndian) { Array($0) })
+        // Wrong version (999)
+        let badVersion: Int32 = 999
+        badData.append(contentsOf: withUnsafeBytes(of: badVersion.bigEndian) { Array($0) })
+        // readingsProcessed = 0
+        let readings: Int32 = 0
+        badData.append(contentsOf: withUnsafeBytes(of: readings.bigEndian) { Array($0) })
+        // Empty JSON for AlgorithmState
+        badData.append(Data("{}\0".utf8))
+
+        XCTAssertThrowsError(try CareSensCalibrator.restoreState(badData, config: Self.createTypicalConfig())) { error in
+            guard case .incompatibleVersion(let expected, let found) = error as? CareSensCalibrator.StateError else {
+                XCTFail("Expected incompatibleVersion error, got \(error)")
+                return
+            }
+            XCTAssertEqual(expected, CareSensCalibrator.stateVersion)
+            XCTAssertEqual(found, 999)
+        }
     }
 
     // ======================================================================

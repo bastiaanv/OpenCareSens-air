@@ -159,9 +159,67 @@ final class EndToEndIntegrationTests: XCTestCase {
     // ======================================================================
 
     func testStatePersistenceThroughBleFlow() throws {
-        // Java: calibrate 10 readings, save/restore, continue, verify continuity
-        // Swift: saveState()/restoreState() are not yet implemented (fatalError).
-        throw XCTSkip("saveState()/restoreState() not yet implemented in Swift")
+        let calibrator = CareSensCalibrator(config)
+
+        // Process readings 1-10
+        for i in 1...10 {
+            let timestamp = Self.sensorStartTime + Int64(i * Self.intervalSeconds)
+            let adcValue = 7800 + i * 10
+            let blePacket = Self.buildBlePacket(
+                seqNumber: i, timestamp: timestamp,
+                rawTemperature: 3400, adcValue: adcValue, deviceErrorCode: 0)
+            let reading = BlePacketParser.parse(blePacket)
+            _ = calibrator.processReading(
+                seqNumber: reading.sequenceNumber,
+                timestamp: reading.timestamp,
+                adcSamples: reading.adcSamples,
+                temperature: reading.temperature)
+        }
+
+        XCTAssertEqual(10, calibrator.readingsProcessed)
+
+        // Save state
+        let savedState = calibrator.saveState()
+        XCTAssertFalse(savedState.isEmpty, "Saved state should not be empty")
+
+        // Restore into a new calibrator
+        let restored = try CareSensCalibrator.restoreState(savedState, config: config)
+        XCTAssertEqual(10, restored.readingsProcessed)
+
+        // Continue processing readings 11-20 on both original and restored
+        for i in 11...20 {
+            let timestamp = Self.sensorStartTime + Int64(i * Self.intervalSeconds)
+            let adcValue = 7800 + i * 10
+            let blePacket = Self.buildBlePacket(
+                seqNumber: i, timestamp: timestamp,
+                rawTemperature: 3400, adcValue: adcValue, deviceErrorCode: 0)
+            let reading = BlePacketParser.parse(blePacket)
+
+            let origResult = calibrator.processReading(
+                seqNumber: reading.sequenceNumber,
+                timestamp: reading.timestamp,
+                adcSamples: reading.adcSamples,
+                temperature: reading.temperature)
+
+            let restResult = restored.processReading(
+                seqNumber: reading.sequenceNumber,
+                timestamp: reading.timestamp,
+                adcSamples: reading.adcSamples,
+                temperature: reading.temperature)
+
+            // Verify continuity: original and restored should produce identical results
+            XCTAssertEqual(origResult.glucoseMgdl, restResult.glucoseMgdl, accuracy: 1e-10,
+                "Glucose mismatch at continued reading \(i)")
+            XCTAssertEqual(origResult.trendRate, restResult.trendRate, accuracy: 1e-10,
+                "TrendRate mismatch at continued reading \(i)")
+            XCTAssertEqual(origResult.errorCode, restResult.errorCode,
+                "ErrorCode mismatch at continued reading \(i)")
+            XCTAssertEqual(origResult.stage, restResult.stage,
+                "Stage mismatch at continued reading \(i)")
+        }
+
+        XCTAssertEqual(20, calibrator.readingsProcessed)
+        XCTAssertEqual(20, restored.readingsProcessed)
     }
 
     // ======================================================================

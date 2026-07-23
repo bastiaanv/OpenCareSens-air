@@ -33,11 +33,11 @@ enum CheckError {
     public static func checkError(_ devInfo: DeviceInfo,
                                   _ algoArgs: AlgorithmState,
                                   _ debug: DebugOutput,
-                                  _ currentGlucose: Double,
-                                  _ correctedCurrent: Double,
-                                  _ seq: Int,
-                                  _ timeNow: Int64,
-                                  _ stage: Int) -> Int {
+                                  currentGlucose: Double,
+                                  correctedCurrent: Double,
+                                  seq: Int,
+                                  timeNow: Int64,
+                                  stage: Int) -> Int {
         var errcode = 0
 
         // --- FIFO maintenance: err_glu_arr and err128_CGM_c_noise_revised_value ---

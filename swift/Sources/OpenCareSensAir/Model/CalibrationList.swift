@@ -3,6 +3,8 @@
 // Passed empty for factory-calibration-only mode.
 // Maps to air1_opcal4_cal_list_t.
 
+import Foundation
+
 /// User calibration list holding BG reference values.
 public final class CalibrationList {
     public var idx: [Int]
