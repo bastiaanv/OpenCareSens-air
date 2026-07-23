@@ -490,11 +490,11 @@ public enum CheckError {
             }
             
             // Delay pre_condi and condi: inactive
-            for _ in 0..<debug.err2DelayPreCondi.count {
-                debug.err2DelayPreCondi[debug.err2DelayPreCondi.count - 1] = 0
+            for i in 0..<debug.err2DelayPreCondi.count {
+                debug.err2DelayPreCondi[i] = 0
             }
-            for _ in 0..<debug.err2DelayCondi.count {
-                debug.err2DelayCondi[debug.err2DelayCondi.count - 1] = 0
+            for i in 0..<debug.err2DelayCondi.count {
+                debug.err2DelayCondi[i] = 0
             }
             debug.err2DelayFlag = 0
         }
